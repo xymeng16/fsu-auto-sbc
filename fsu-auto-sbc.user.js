@@ -118,20 +118,17 @@
       console.log("wait for reward claim pop-up to show");
       await unsafeWindow.events.wait(2, 3);
       console.log("reward claim pop-up showing");
-      // gPopupClickShield.queue[0].getView()._actionBtn._tapDetected();
-      // console.log("wait for 2nd reward claim pop-up to show");
-      // await unsafeWindow.events.wait(2, 3);
-      // console.log("reward claim pop-up showing");
-      // gPopupClickShield.queue[0].getView()._actionBtn._tapDetected();
+
       let counter = 0;
       while (true) {
         if (gPopupClickShield.queue.length > 0) {
-          gPoupClickShield.hideShield();
+          gPopupClickShield.hideShield();
           counter++;
           if (counter == 2) {
             break;
           }
         }
+        await unsafeWindow.events.wait(0.2, 0.4);
       }
     }
 
