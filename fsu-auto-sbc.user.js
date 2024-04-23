@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FSU-Auto-SBC
 // @namespace    xiangyi
-// @version      0.1-alpha+24.17
+// @version      0.2-alpha+24.17
 // @description  Auto SBC for EA FC24 UT with FSU plugin
 // @author       xiangyi
 // @match        https://www.ea.com/ea-sports-fc/ultimate-team/web-app/*
@@ -71,14 +71,20 @@
   }
 
   var sbc = {};
+  var _delay;
 
-  sbc.doDailySBC = async (SBCs) => {
+  async function delay() {
+    await unsafeWindow.events.wait(_delay, _delay + 1);
+  }
+
+  sbc.doDailySBC = async (SBCs, delay_time) => {
     let dailySBCs = SBCs ?? [
       "TOTS Warm up Daily Login Upgrade",
       "Daily Bronze Upgrade",
       "Daily Silver Upgrade",
       "Daily Gold Upgrade",
     ];
+    _delay = delay_time ?? 1.5;
     let allSBCs = services.SBC.repository.getSets();
 
     // found name matched in allSBCs and saved into sbcSetEntities
@@ -124,7 +130,7 @@
     unsafeWindow.events.goToSBC(SBCSetEntity);
     // need to wait for the SBC Hub to load completely
     while (cntlr.current().constructor == UTSBCHubViewController) {
-      await unsafeWindow.events.wait(0.2, 0.4);
+      await delay();
     }
 
     async function doSBC() {
@@ -135,7 +141,12 @@
       // TODO: check if the squad is filled
       submitBtn._tapDetected();
       console.log("[FSU-Auto-SBC] wait for reward claim pop-up to show");
-      await unsafeWindow.events.wait(2, 3);
+      while (true) {
+        if (gPopupClickShield.queue.length > 0) {
+          break;
+        }
+        await delay();
+      }
       console.log("[FSU-Auto-SBC] reward claim pop-up showing");
 
       let counter = 0;
@@ -147,24 +158,30 @@
             break;
           }
         }
-        await unsafeWindow.events.wait(0.2, 0.4);
+        await delay();
       }
     }
 
     switch (cntlr.current().constructor) {
       case UTSBCSquadSplitViewController: {
+        // TODO: make sure not only the root view is loaded
         console.log("[FSU-Auto-SBC] SBC started: ", SBCSetEntity.name);
         await doSBC();
         console.log("[FSU-Auto-SBC] SBC completed: ", SBCSetEntity.name);
         break;
       }
       case UTSBCGroupChallengeSplitViewController: {
+        // make sure not only the root view is loaded
+        while (cntlr.left().getView()._challengeRows.length == 0) {
+          await delay();
+        }
+
         let numOfchallenges = cntlr.left().getView()._challengeRows.length;
         for (let i = 0; i < numOfchallenges; i++) {
           if (cntlr.left().getView()._challengeRows[i].isInteractionEnabled()) {
             cntlr.left().getView()._challengeRows[i]._tapDetected();
             // TODO: how to elegantly confirm that the challenge is selected and the right view is changed?
-            await unsafeWindow.events.wait(0.2, 0.4);
+            await delay();
             cntlr
               .current()
               ._rightController.getView()
@@ -173,7 +190,7 @@
             while (
               cntlr.current().constructor != UTSBCSquadSplitViewController
             ) {
-              await unsafeWindow.events.wait(0.2, 0.4);
+              await delay();
             }
             await doSBC();
           }
