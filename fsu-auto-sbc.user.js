@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FSU-Auto-SBC
 // @namespace    xiangyi
-// @version      0.2-24.17
+// @version      0.1-alpha+24.17
 // @description  Auto SBC for EA FC24 UT with FSU plugin
 // @author       xiangyi
 // @match        https://www.ea.com/ea-sports-fc/ultimate-team/web-app/*
@@ -80,33 +80,52 @@
       "Daily Gold Upgrade",
     ];
     let allSBCs = services.SBC.repository.getSets();
+
     // found name matched in allSBCs and saved into sbcSetEntities
     let sbcSetEntities = [];
     for (let i = 0; i < dailySBCs.length; i++) {
       for (let j = 0; j < allSBCs.length; j++) {
         if (dailySBCs[i] === allSBCs[j].name) {
-          if (!allSBCs[j].challengesComplete()) {
+          if (!allSBCs[j].isComplete()) {
             sbcSetEntities.push(allSBCs[j]);
+          } else {
+            console.log(
+              "[FSU-Auto-SBC] SBC already completed: ",
+              allSBCs[j].name,
+            );
           }
           break;
         }
       }
     }
 
-    unsafeWindow.events.showLoader();
+    console.log(
+      "[FSU-Auto-SBC] SBCs to do: ",
+      sbcSetEntities.map((s) => s.name),
+    );
+
     for (let i = 0; i < sbcSetEntities.length; i++) {
-      await sbc.autoDoSBC(sbcSetEntities[i]);
+      if (sbcSetEntities[i].isLimitedRepeatable) {
+        for (let j = 0; j < sbcSetEntities[i].repeats; j++) {
+          await sbc.autoDoSBC(sbcSetEntities[i]);
+        }
+      } else if (sbcSetEntities[i].isRepeatable) {
+        while (true) {
+          await sbc.autoDoSBC(sbcSetEntities[i]);
+        }
+      } else {
+        // do once
+        await sbc.autoDoSBC(sbcSetEntities[i]);
+      }
     }
-    unsafeWindow.events.hideLoader();
   };
 
   sbc.autoDoSBC = async (SBCSetEntity) => {
     unsafeWindow.events.goToSBC(SBCSetEntity);
-    // need to wait for the SBC to load completely
-    // TODO: modify the tricky loop with a better solution
-    console.log("wait for SBC squad loaded");
-    await unsafeWindow.events.wait(3, 4);
-    let controller = cntlr.current();
+    // need to wait for the SBC Hub to load completely
+    while (cntlr.current().constructor == UTSBCHubViewController) {
+      await unsafeWindow.events.wait(0.2, 0.4);
+    }
 
     async function doSBC() {
       let autoFillBtn = cntlr.right().getView()._fsuAutoFill;
@@ -115,9 +134,9 @@
       autoFillBtn._tapDetected();
       // TODO: check if the squad is filled
       submitBtn._tapDetected();
-      console.log("wait for reward claim pop-up to show");
+      console.log("[FSU-Auto-SBC] wait for reward claim pop-up to show");
       await unsafeWindow.events.wait(2, 3);
-      console.log("reward claim pop-up showing");
+      console.log("[FSU-Auto-SBC] reward claim pop-up showing");
 
       let counter = 0;
       while (true) {
@@ -132,7 +151,7 @@
       }
     }
 
-    switch (controller.constructor) {
+    switch (cntlr.current().constructor) {
       case UTSBCSquadSplitViewController: {
         console.log("[FSU-Auto-SBC] SBC started: ", SBCSetEntity.name);
         await doSBC();
@@ -140,6 +159,25 @@
         break;
       }
       case UTSBCGroupChallengeSplitViewController: {
+        let numOfchallenges = cntlr.left().getView()._challengeRows.length;
+        for (let i = 0; i < numOfchallenges; i++) {
+          if (cntlr.left().getView()._challengeRows[i].isInteractionEnabled()) {
+            cntlr.left().getView()._challengeRows[i]._tapDetected();
+            // TODO: how to elegantly confirm that the challenge is selected and the right view is changed?
+            await unsafeWindow.events.wait(0.2, 0.4);
+            cntlr
+              .current()
+              ._rightController.getView()
+              ._btnConfirm._tapDetected();
+            // wait until the squad is loaded
+            while (
+              cntlr.current().constructor != UTSBCSquadSplitViewController
+            ) {
+              await unsafeWindow.events.wait(0.2, 0.4);
+            }
+            await doSBC();
+          }
+        }
         break;
       }
     }
