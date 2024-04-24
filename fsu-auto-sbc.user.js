@@ -199,6 +199,30 @@
       }
     }
   };
+
+  // cntlr.current().getView().storePacks[0]._btnOpen._tapDetected();
+  // cntlr.left().getView()._fsuClub._tapDetected();
+  // if duplicate, dupList = cntlr.left().getViewModel().getDuplicateSection()
+  // quick sell: cntlr.left().quickSell(
+  //  cntlr.left().getViewModel().getDiscardableInfo().duplicates.entities,
+  //  cntlr.left().getViewModel().getDiscardableInfo().duplicates.value
+  // )
+  // repositories.Store.myPacks
+
+  // packs: { "name1": count1, "name2": count2, ...} /* if count is 0, then open all matched packs in stock */
+  // dupRules: [["80+ Player Pick"], ["83+ TOTW Player Pick"]] /* 0-81, 82-85, 86+:stop; SBC Names or "QS" to quick sell */
+  sbc.autoPacking = async (packs, dupRules, delay_time) => {
+    // TODO: currently assume there isn't unassigned item and is on Packs tab
+    if (cntlr.current().getView().constructor != UTStoreView) {
+      console.error("[FSU-Auto-SBC] Not in Packs tab");
+      return;
+    }
+    if (unsafeWindow.repositories.Item.getUnassignedItems().length > 0) {
+      console.error("[FSU-Auto-SBC] Unassigned items found");
+      return;
+    }
+  };
+
   waitForFSU();
   unsafeWindow.events.notice("FSU-Auto-SBC module loaded!");
   unsafeWindow.sbc = sbc;
