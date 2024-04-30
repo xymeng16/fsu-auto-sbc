@@ -127,22 +127,29 @@
   };
 
   sbc.autoDoSBC = async (SBCSetEntity) => {
+    // need to confirm the current view is SBC Hub
+    while (cntlr.current().constructor != UTSBCHubViewController) {
+      await delay();
+    }
+
     unsafeWindow.events.goToSBC(SBCSetEntity);
-    // need to wait for the SBC Hub to load completely
+
+    // need to wait for the SBC page to load completely
     while (cntlr.current().constructor == UTSBCHubViewController) {
       await delay();
     }
 
-    async function doSBC() {
+    async function doSBC(isFromGroupChallenge) {
       let autoFillBtn = cntlr.right().getView()._fsuAutoFill;
       let submitBtn = cntlr.current().getView()._lView.rightTab;
+      let expectedPopupQueueLength = isFromGroupChallenge ? 1 : 2;
 
       autoFillBtn._tapDetected();
       // TODO: check if the squad is filled
       submitBtn._tapDetected();
       console.log("[FSU-Auto-SBC] wait for reward claim pop-up to show");
       while (true) {
-        if (gPopupClickShield.queue.length > 0) {
+        if (gPopupClickShield.queue.length >= expectedPopupQueueLength) {
           break;
         }
         await delay();
@@ -152,9 +159,16 @@
       let counter = 0;
       while (true) {
         if (gPopupClickShield.queue.length > 0) {
-          gPopupClickShield.hideShield();
+          // let oldQueneLength = gPopupClickShield.queue.length;
+          gPopupClickShield.queue[0].getView()._actionBtn._tapDetected();
           counter++;
-          if (counter == 2) {
+          // if (oldQueneLength - 1 != gPopupClickShield.queue.length) {
+          //   console.log(
+          //     "[FSU-Auto-SBC] very strange inconsistency in popup queue length, idk how to handle it.",
+          //   );
+          //   throw new Error("pop up length does not decrease by 1");
+          // }
+          if (counter == expectedPopupQueueLength) {
             break;
           }
         }
@@ -166,7 +180,7 @@
       case UTSBCSquadSplitViewController: {
         // TODO: make sure not only the root view is loaded
         console.log("[FSU-Auto-SBC] SBC started: ", SBCSetEntity.name);
-        await doSBC();
+        await doSBC(true);
         console.log("[FSU-Auto-SBC] SBC completed: ", SBCSetEntity.name);
         break;
       }
@@ -192,11 +206,19 @@
             ) {
               await delay();
             }
-            await doSBC();
+            await doSBC(true);
+            // wait unilt the challenge view is loaded
           }
         }
         break;
       }
+    }
+
+    // SBC is finished, claim the final reward
+    gPopupClickShield.queue[0].getView()._actionBtn._tapDetected();
+    // wait unilt the Popup is hidden
+    while (gPopupClickShield.queue.length > 0) {
+      await delay();
     }
   };
 
@@ -221,6 +243,11 @@
       console.error("[FSU-Auto-SBC] Unassigned items found");
       return;
     }
+
+    _delay = delay_time ?? 1.5;
+
+    // every time a pack is opened, the storePakcs will be updated
+    // so we need to get the current storePacks every time
   };
 
   waitForFSU();
